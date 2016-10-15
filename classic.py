@@ -8,7 +8,7 @@ Created on Wed Oct 12 14:17:09 2016
 import pandas as pd
 import numpy as np
 from sklearn import linear_model
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import mean_absolute_error
 import os
 os.chdir('D:\\allstate')
 df_train=pd.read_csv("train.csv")
@@ -16,59 +16,60 @@ df_test=pd.read_csv("test.csv")
 
 
 ntrain=df_train.shape[0]
-ntrainridge=round(0.5*ntrain, 0)
-ncv=round(0.1*ntrain,0)
-df_train_ridreg=df_train[:ntrainridge,:]
-df_train_cv=df_train[ntrainridge:ntrainridge+ncv,:]
-df_train_xgboost=df_train[ntrainridge+ncv:,:]
+ntrainridge=int(round(0.5*ntrain, 0))
+ncv=int(round(0.1*ntrain,0))
+
+df_train_ridreg=df_train.iloc[:ntrainridge,:]
+df_train_cv=df_train.iloc[ntrainridge:ntrainridge+ncv,:]
+df_train_xgboost=df_train.iloc[ntrainridge+ncv:,:]
 
 
 
 for c in df_train.columns:
     if 'cat' in c:
-        df_train_ridreg[c]=df_train[c].astype('category')
-        df_train_cv[c]=df_train[c].astype('category')
-        df_train_xgboost[c]=df_train[c].astype('category')
-        df_test[c]=df_test[c]. astype('category')
-        df_train_ridreg[c + '_numeric'] = df_train[c].cat.codes
-        df_train_cv[c + '_numeric'] = df_train[c].cat.codes
-        df_train_xgboost[c + '_numeric'] = df_train[c].cat.codes
+        df_train_ridreg[c]=df_train_ridreg[c].astype('category')
+        df_train_ridreg[c + '_numeric'] = df_train_ridreg[c].cat.codes
+        df_train_cv[c]=df_train_cv[c].astype('category')
+        df_train_cv[c + '_numeric'] = df_train_cv[c].cat.codes
+        df_train_xgboost[c]=df_train_xgboost[c].astype('category')
+        df_train_xgboost[c + '_numeric'] = df_train_xgboost[c].cat.codes
+        df_test[c]=df_test[c]. astype('category')   
         df_test[c + '_numeric'] = df_test[c].cat.codes
 
 cont_cols=[]
-for c in df_train.columns:
+for c in df_train_ridreg.columns:
     if 'cont' in c:
         cont_cols.append(c)
 cat_num_cols=[]
-for c in df_train.colums:
+for c in df_train_ridreg.columns:
     if 'numeric' in c:
         cat_num_cols.append(c)
 
        
         
-x_train_ridreg=df_train_ridreg[:,cat_num_cols]
-x_train_cv_rr=df_train_cv[:,cat_num_cols]
-x_train_xgboost=df_train_xgboost[:,cat_num_cols]
-y_train_ridreg=df_train_ridreg[:,'loss']
-y_train_cv_rr=df_train_cv[:,'loss']
+x_train_ridreg=df_train_ridreg[cat_num_cols]
+x_train_cv_rr=df_train_cv[cat_num_cols]
+x_train_xgboost=df_train_xgboost[cat_num_cols]
+y_train_ridreg=df_train_ridreg['loss']
+y_train_cv_rr=df_train_cv['loss']
 
 
 regr = linear_model.Ridge(alpha = 0.1)
 regr.fit(x_train_ridreg,y_train_ridreg)
 print('Ridge Accuracy')
-print(accuracy_score(y_train_cv_rr, regr.predict(x_train_cv_rr)))
+print(mean_absolute_error(y_train_cv_rr, regr.predict(x_train_cv_rr)))
 
 
-x_train_blend=df_train_xgboost[:,cont_cols]
-x_train_blend['ridge_input']=regr.predict(x_train_xgboost)
-x_test_blend=df_test[:,cont_cols]
-x_test_blend['ridge_input']=regr.predict(x_test_blend)
+x_train_blend=df_train_xgboost[cont_cols]
+x_train_blend['ridge_input']=regr.predict(df_train_xgboost[cat_num_cols])
+x_test_blend=df_test[cont_cols]
+x_test_blend['ridge_input']=regr.predict(df_test[cat_num_cols])
 
 
 
 x_train=np.array(x_train_blend)
 x_test=np.array(x_train_blend)
-y_train=df_train_xgboost[:,'loss']
+y_train=df_train_xgboost['loss']
 
 
 dtrain = xgb.DMatrix(x_train, label=y_train)
